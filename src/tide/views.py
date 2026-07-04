@@ -31,8 +31,9 @@ def _files(arg: str | None, session: Session) -> list[str]:
 
 
 def _search(arg: str | None, session: Session) -> list[str]:
-    query = arg or session.query
-    return ["rgi", *([query] if query else [])]
+    # rgi's query is a full `rg ...` command line, restored verbatim via
+    # $TIDE_QUERY (set in launch()), not re-parsed as a pattern argument.
+    return ["rgi"]
 
 
 def _git(arg: str | None, session: Session) -> list[str]:
