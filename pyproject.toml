@@ -1,0 +1,23 @@
+[project]
+name = "tide"
+version = "0.1.0"
+description = "A single terminal surface that summons file-find, search, git, and edit views"
+readme = "README.md"
+authors = [
+    { name = "Dan Davison", email = "dandavison7@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+tide = "tide:main"
+
+[build-system]
+requires = ["uv_build>=0.9.18,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.20",
+    "ty>=0.0.56",
+]
