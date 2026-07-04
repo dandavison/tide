@@ -26,6 +26,7 @@ def run(start: str = "files") -> None:
             if view not in VIEWS:
                 raise SystemExit(f"tide: unknown view {view!r}")
             launch(view, arg, session, state)
+            _capture_query(session, state)
             view, arg = _next(state, session)
             _persist(session, store)
 
@@ -41,6 +42,14 @@ def _next(state: Path, session: Session) -> tuple[str, str | None]:
     elif view == "search" and arg:
         session.query = arg
     return view or "quit", arg
+
+
+def _capture_query(session: Session, state: Path) -> None:
+    """Pick up the query a view (rgi) reported via $TIDE_QUERY_OUT on exit."""
+    out = state.with_name("query")
+    if out.exists():
+        session.query = out.read_text().strip()
+        out.unlink()
 
 
 def _store_path(root: Path) -> Path:

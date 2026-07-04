@@ -23,13 +23,16 @@ chord, exits after naming the next view.
 One chord set, honored inside every view. `Alt` so it never collides with
 typing text or a search query:
 
-| Chord   | View       | Mnemonic                    |
-|---------|------------|-----------------------------|
-| `Alt-f` | files      | **f**iles (index, home key) |
-| `Alt-j` | search     | index, home key             |
-| `Alt-d` | git        | **d**iff                    |
-| `Alt-k` | edit       | resume last buffer          |
-| `Ctrl-c`| dismiss    | (micro: `Save,Quit`)        |
+Held on the right-hand home row, so you can keep `Alt` down and walk across
+`j k l ;`:
+
+| Chord   | View       |
+|---------|------------|
+| `Alt-j` | files      |
+| `Alt-k` | search     |
+| `Alt-l` | git        |
+| `Alt-;` | edit (resumes last file) |
+| `Esc` / `Ctrl-c` | dismiss (back to the work pane) |
 
 ## Protocol
 
@@ -42,24 +45,26 @@ view, before exiting, writes the next directive there:
                     (empty / absent = dismiss the surface)
 ```
 
-Also exported: `$TIDE_ROOT` (project root), `$TIDE_QUERY` (last search text, so
-`Alt-j` from files carries the typed text into rgi). stdout belongs to the
-tool's TUI, so the state file is the only channel that survives a view exit.
+Also exported: `$TIDE_ROOT` (project root) and `$TIDE_QUERY` (last search text).
+A view may report its own query back by writing it to `$TIDE_QUERY_OUT` on exit
+(rgi does this), so re-summoning search resumes it. stdout belongs to the tool's
+TUI, so these files are the only channel that survives a view exit.
 
-Wiring each tool to emit directives is per-tool and incremental; the engine is
-ready the moment a tool writes to `$TIDE_STATE`.
+Session state (last file, last query) is persisted per project root under
+`$XDG_STATE_HOME/tide/`, so dismissing and re-summoning resumes where you were.
 
 ## tmux summon
 
-The same `Alt-{f,j,d,k}` chords work from outside: each opens the full-screen
+The same `Alt-{j,k,l,;}` chords work from outside: each opens the full-screen
 popup straight into its view, so the muscle memory is identical whether tide is
-open or not.
+open or not. Launched via interactive zsh because the tmux server's PATH is
+minimal.
 
 ```tmux
-bind -n M-f display-popup -E -w 100% -h 100% 'tide files'
-bind -n M-j display-popup -E -w 100% -h 100% 'tide search'
-bind -n M-d display-popup -E -w 100% -h 100% 'tide git'
-bind -n M-k display-popup -E -w 100% -h 100% 'tide edit'
+bind -n M-j display-popup -E -d "#{pane_current_path}" -w 100% -h 100% "SKIP_XOLMIS=1 zsh -ic 'tide files'"
+bind -n M-k display-popup -E -d "#{pane_current_path}" -w 100% -h 100% "SKIP_XOLMIS=1 zsh -ic 'tide search'"
+bind -n M-l display-popup -E -d "#{pane_current_path}" -w 100% -h 100% "SKIP_XOLMIS=1 zsh -ic 'tide git'"
+bind -n M-\; display-popup -E -d "#{pane_current_path}" -w 100% -h 100% "SKIP_XOLMIS=1 zsh -ic 'tide edit'"
 ```
 
 Confirmed: root-table (`-n`) bindings do **not** fire while a popup is focused —

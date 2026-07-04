@@ -21,6 +21,7 @@ def launch(view: str, arg: str | None, session: Session, state: Path) -> None:
         "TIDE_STATE": str(state),
         "TIDE_ROOT": str(session.root),
         "TIDE_QUERY": session.query,
+        "TIDE_QUERY_OUT": str(state.with_name("query")),
     }
     subprocess.run(_COMMANDS[view](arg, session), cwd=session.root, env=env)
 
