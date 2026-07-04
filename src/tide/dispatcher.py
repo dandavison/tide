@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 import tempfile
 from pathlib import Path
 
@@ -10,11 +13,12 @@ from .views import launch
 def run(start: str = "files") -> None:
     """Own one full-screen surface, swapping between views until dismissed.
 
-    A view runs until it exits, having optionally written a directive naming
-    the next view (and an argument) to the state file. No directive means the
-    surface is dismissed.
+    Session state (last file, last query) is persisted per project root and
+    restored on launch, so dismissing and re-summoning resumes where you were.
     """
     session = Session(root=Path.cwd())
+    store = _store_path(session.root)
+    _restore(session, store)
     with tempfile.TemporaryDirectory(prefix="tide.") as tmp:
         state = Path(tmp) / "next"
         view, arg = start, None
@@ -23,6 +27,7 @@ def run(start: str = "files") -> None:
                 raise SystemExit(f"tide: unknown view {view!r}")
             launch(view, arg, session, state)
             view, arg = _next(state, session)
+            _persist(session, store)
 
 
 def _next(state: Path, session: Session) -> tuple[str, str | None]:
@@ -36,3 +41,24 @@ def _next(state: Path, session: Session) -> tuple[str, str | None]:
     elif view == "search" and arg:
         session.query = arg
     return view or "quit", arg
+
+
+def _store_path(root: Path) -> Path:
+    base = os.environ.get("XDG_STATE_HOME") or str(Path.home() / ".local" / "state")
+    directory = Path(base) / "tide"
+    directory.mkdir(parents=True, exist_ok=True)
+    key = hashlib.sha1(str(root).encode(), usedforsecurity=False).hexdigest()[:16]
+    return directory / f"{key}.json"
+
+
+def _restore(session: Session, store: Path) -> None:
+    try:
+        data = json.loads(store.read_text())
+    except (OSError, ValueError):
+        return
+    session.file = data.get("file") or None
+    session.query = data.get("query") or ""
+
+
+def _persist(session: Session, store: Path) -> None:
+    store.write_text(json.dumps({"file": session.file, "query": session.query}))
