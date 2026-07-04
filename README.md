@@ -1,79 +1,52 @@
 # tide
 
-A single terminal surface that summons four full-screen views — **files**,
-**search**, **git**, **edit** — one at a time. Built for alacritty + tmux,
-one window per project, zoomed.
-
-Not a monolith: a thin dispatcher over existing tools
-([fsi](https://github.com/dandavison/fzfui), rgi, gitu, micro). The dispatcher
-owns the screen and runs exactly one tool at a time; each tool, on a switch
-chord, exits after naming the next view.
+Per-project persistent browser windows in tmux, over your existing tools
+([fsi](https://github.com/dandavison/fzfui), rgi, gitu, micro). Built for
+alacritty + tmux with wormhole managing one window per project.
 
 ## Model
 
-- Summoned as a full-screen tmux popup over the current pane. The work pane
-  (server, logs, tests) keeps running underneath, undisturbed.
-- Always exactly one view, full screen. Switching swaps the whole surface —
-  never a split, never a stack.
-- micro is stateless: each edit opens a fresh micro; there is no resident
-  editor to remote-control.
+- **files**, **search**, **git** are long-lived tmux windows, one per project,
+  each running the respective tool (fsi / rgi / gitu). `Alt-{j,k,l}` find-or-
+  create-and-select the window for the current project. Persistent: switching
+  away leaves the tool running; switching back resumes it exactly. Pressing the
+  key for the view you're already in returns to the main (work) window.
+- **edit** is not a window. Each browser opens micro as a **child** on Enter
+  (`RET` on a hunk in gitu); `Ctrl-C` (micro `Save,Quit`) pops back to the
+  browser you launched from. The editor is wired purely via env vars —
+  `FSI_ACTION=micro`, `RGI_EDITOR=micro`, `GITU_SHOW_EDITOR=micro` — so the
+  tools stay unmodified and standalone.
+- Switching between views is plain tmux window selection, so no dispatcher, no
+  IPC, and every view keeps full state (fzf query, scroll, cursor).
 
-## Transitions
+## wormhole integration
 
-One chord set, honored inside every view. `Alt` so it never collides with
-typing text or a search query:
+tide tags each window it creates with tmux window options `@project =
+<store_key>` (wormhole's generic per-project key) and `@view`. wormhole's only
+knowledge of these windows is additive and tide-agnostic:
 
-Held on the right-hand home row, so you can keep `Alt` down and walk across
-`j k l ;`:
+- `close(project)` also kills windows whose `@project` matches the store_key.
+- `open(project)` sets `@project` on the main window for consistency.
 
-| Chord   | View       |
-|---------|------------|
-| `Alt-j` | files      |
-| `Alt-k` | search     |
-| `Alt-l` | git        |
-| `Alt-;` | edit (resumes last file) |
-| `Esc` / `Ctrl-c` | dismiss (back to the work pane) |
+wormhole's name-based logic (`window_names`, `is_active`, `project_directories`)
+is untouched: tide window names (`<store_key>:<view>`) never equal a store_key
+(`:` is illegal in git refs) and contain no space, and their `cwd` collapses
+into the project's existing ring entry.
 
-## Protocol
+## tmux binds
 
-The dispatcher creates a state file and passes its path as `$TIDE_STATE`. A
-view, before exiting, writes the next directive there:
-
-```
-<view>              switch to view          e.g. search
-<view>\t<arg>       switch, with argument   e.g. edit\tsrc/tide/views.py:42
-                    (empty / absent = dismiss the surface)
-```
-
-Also exported: `$TIDE_ROOT` (project root) and `$TIDE_QUERY` (last search text).
-A view may report its own query back by writing it to `$TIDE_QUERY_OUT` on exit
-(rgi does this), so re-summoning search resumes it. stdout belongs to the tool's
-TUI, so these files are the only channel that survives a view exit.
-
-Session state (last file, last query) is persisted per project root under
-`$XDG_STATE_HOME/tide/`, so dismissing and re-summoning resumes where you were.
-
-## tmux summon
-
-The same `Alt-{j,k,l,;}` chords work from outside: each opens the full-screen
-popup straight into its view, so the muscle memory is identical whether tide is
-open or not. Launched via interactive zsh because the tmux server's PATH is
-minimal.
+Context is passed by the binding (tmux expands `#{...}` for the pane where the
+key fired), so tide acts on exactly that pane and never guesses the "current"
+window:
 
 ```tmux
-bind -n M-j display-popup -E -d "#{pane_current_path}" -w 100% -h 100% "SKIP_XOLMIS=1 zsh -ic 'tide files'"
-bind -n M-k display-popup -E -d "#{pane_current_path}" -w 100% -h 100% "SKIP_XOLMIS=1 zsh -ic 'tide search'"
-bind -n M-l display-popup -E -d "#{pane_current_path}" -w 100% -h 100% "SKIP_XOLMIS=1 zsh -ic 'tide git'"
-bind -n M-\; display-popup -E -d "#{pane_current_path}" -w 100% -h 100% "SKIP_XOLMIS=1 zsh -ic 'tide edit'"
+bind -n M-j run-shell -b "$HOME/.local/bin/tide files  '#{window_name}' '#{@project}' '#{@view}' '#{pane_current_path}' '#{session_name}'"
+bind -n M-k run-shell -b "$HOME/.local/bin/tide search '#{window_name}' '#{@project}' '#{@view}' '#{pane_current_path}' '#{session_name}'"
+bind -n M-l run-shell -b "$HOME/.local/bin/tide git    '#{window_name}' '#{@project}' '#{@view}' '#{pane_current_path}' '#{session_name}'"
 ```
 
-Confirmed: root-table (`-n`) bindings do **not** fire while a popup is focused —
-the popup owns input. So the outside chords open the surface and the inside
-chords (below) switch views, with no conflict and no guard needed.
-
-## Run
+## Install
 
 ```
-uv run tide            # start in files
-uv run tide search
+uv tool install -e .
 ```
