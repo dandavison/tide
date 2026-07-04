@@ -62,10 +62,9 @@ bind -n M-d display-popup -E -w 100% -h 100% 'tide git'
 bind -n M-k display-popup -E -w 100% -h 100% 'tide edit'
 ```
 
-Open question to settle empirically: whether these root-table (`-n`) bindings
-also fire while the popup is focused, shadowing the tools' own `Alt-{f,j,d,k}`.
-If so, guard each so it is inert (or switches the running view) when a tide
-popup is already active, rather than stacking a second popup.
+Confirmed: root-table (`-n`) bindings do **not** fire while a popup is focused —
+the popup owns input. So the outside chords open the surface and the inside
+chords (below) switch views, with no conflict and no guard needed.
 
 ## Run
 
