@@ -35,11 +35,13 @@ os.environ["PATH"] = os.pathsep.join(
 )
 
 # `zsh -ic` gives the tools the login PATH; the env var makes each open micro
-# (as a child) at the selected line.
+# (as a child) at the selected line. `exec` replaces the shell with the tool so
+# the window's root process IS the tool: quitting it closes the window (rather
+# than falling back to an interactive shell that looks like the work window).
 VIEWS = {
-    "files": "FSI_ACTION=micro fsi",
-    "search": "RGI_EDITOR=micro rgi",
-    "git": "GITU_SHOW_EDITOR=micro gitu",
+    "files": "exec env FSI_ACTION=micro fsi",
+    "search": "exec env RGI_EDITOR=micro rgi",
+    "git": "exec env GITU_SHOW_EDITOR=micro gitu",
 }
 
 
