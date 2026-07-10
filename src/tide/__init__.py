@@ -45,12 +45,15 @@ VIEWS = {
 }
 
 
+COMMANDS = (*VIEWS, "home")
+
+
 def main() -> None:
-    if len(sys.argv) < 2 or sys.argv[1] not in VIEWS:
+    if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
         sys.exit(
-            f"usage: tide {{{'|'.join(VIEWS)}}} <window_name> <project> <view> <path> <session>"
+            f"usage: tide {{{'|'.join(COMMANDS)}}} <window_name> <project> <view> <path> <session>"
         )
-    view = sys.argv[1]
+    command = sys.argv[1]
     context = sys.argv[2:7]
     if len(context) < 5:  # convenience for manual invocation from inside a pane
         context = _tmux(
@@ -60,11 +63,12 @@ def main() -> None:
         ).split("\t")
     name, project, current_view, path, session = context
     store_key = project or name
-    if current_view == view:
-        # Pressing the current view's key toggles back to the work window.
+    # `home` always goes to the work window; a view key toggles back if you are
+    # already in that view.
+    if command == "home" or command == current_view:
         _select_main(store_key, session)
     else:
-        summon(view, store_key, path, session)
+        summon(command, store_key, path, session)
 
 
 def summon(view: str, store_key: str, path: str, session: str) -> None:

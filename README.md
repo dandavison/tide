@@ -9,8 +9,9 @@ alacritty + tmux with wormhole managing one window per project.
 - **files**, **search**, **git** are long-lived tmux windows, one per project,
   each running the respective tool (fsi / rgi / gitu). `Alt-{j,k,l}` find-or-
   create-and-select the window for the current project. Persistent: switching
-  away leaves the tool running; switching back resumes it exactly. Pressing the
-  key for the view you're already in returns to the main (work) window.
+  away leaves the tool running; switching back resumes it exactly. `Alt-;`
+  (`tide home`) always returns to the main (work) window; pressing the key for
+  the view you're already in does the same.
 - **edit** is not a window. Each browser opens micro as a **child** on Enter
   (`RET` on a hunk in gitu); `Ctrl-C` (micro `Save,Quit`) pops back to the
   browser you launched from. The editor is wired purely via env vars —
