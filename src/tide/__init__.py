@@ -8,7 +8,8 @@ the pane where the key fired — no reliance on tmux's ambiguous "current window
 Each browser view is a long-lived tmux window running the tool; the tool opens
 micro as a child on Enter (Ctrl-C pops back), and switching between views is
 plain tmux window selection. There is no "edit" window — editing is always a
-child of a browser.
+child of a browser. Summoning a view always ensures the root browser tool is
+foregrounded, automatically saving and popping micro (via Ctrl-C) if active.
 
 Windows are tagged `@project = <store_key>` (wormhole's generic key, so wormhole
 reaps them on project close) and `@view`. The owning project is the current
@@ -64,8 +65,14 @@ def main() -> None:
     name, project, current_view, path, session = context
     store_key = project or name
     # `home` always goes to the work window; a view key toggles back if you are
-    # already in that view.
-    if command == "home" or command == current_view:
+    # already in that view (unless micro is active, in which case it pops back
+    # to the browser tool).
+    if command == "home":
+        _select_main(store_key, session)
+    elif command == current_view:
+        window = _find_window(store_key, current_view, session)
+        if window and _pop_micro(window):
+            return
         _select_main(store_key, session)
     else:
         summon(command, store_key, path, session)
@@ -74,6 +81,7 @@ def main() -> None:
 def summon(view: str, store_key: str, path: str, session: str) -> None:
     existing = _find_window(store_key, view, session)
     if existing:
+        _pop_micro(existing)
         _tmux("select-window", "-t", existing)
         return
 
@@ -121,3 +129,28 @@ def _tmux(*args: str) -> str:
     return subprocess.run(
         ["tmux", *args], capture_output=True, text=True, check=True
     ).stdout.strip()
+
+
+def _pop_micro(window: str) -> bool:
+    """If micro is running as a child in window, pop back to the browser tool."""
+    if not _has_process(window, "micro"):
+        return False
+    _tmux("send-keys", "-t", window, "C-c")
+    return True
+
+
+def _has_process(window: str, name: str) -> bool:
+    """Check whether a process named `name` is running on the window's pane tty."""
+    try:
+        tty = _tmux("display-message", "-p", "-t", window, "#{pane_tty}")
+        if not tty:
+            return False
+        out = subprocess.run(
+            ["ps", "-t", tty, "-o", "comm="],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        return any(os.path.basename(line.strip()) == name for line in out.splitlines())
+    except Exception:
+        return False

@@ -11,10 +11,13 @@ alacritty + tmux with wormhole managing one window per project.
   create-and-select the window for the current project. Persistent: switching
   away leaves the tool running; switching back resumes it exactly. `Alt-;`
   (`tide home`) always returns to the main (work) window; pressing the key for
-  the view you're already in does the same.
+  the view you're already in does the same (unless micro is active, in which case
+  it pops micro back to the browser tool).
 - **edit** is not a window. Each browser opens micro as a **child** on Enter
   (`RET` on a hunk in gitu); `Ctrl-C` (micro `Save,Quit`) pops back to the
-  browser you launched from. The editor is wired purely via env vars —
+  browser you launched from. Summoning a browser view automatically sends
+  `Ctrl-C` to pop micro if it was left active, so you always land on the search
+  UI ready to type. The editor is wired purely via env vars —
   `FSI_ACTION=micro`, `RGI_EDITOR=micro`, `GITU_SHOW_EDITOR=micro` — so the
   tools stay unmodified and standalone.
 - Switching between views is plain tmux window selection, so no dispatcher, no
