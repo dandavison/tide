@@ -23,6 +23,7 @@ import os
 import shlex
 import subprocess
 import sys
+import time
 
 # The tmux server runs with a minimal PATH; ensure we can find tmux. We stay on
 # the right server via $TMUX, inherited from the run-shell that invoked us.
@@ -72,6 +73,8 @@ def main() -> None:
     elif command == current_view:
         window = _find_window(store_key, current_view, session)
         if window and _pop_micro(window):
+            if command == "files":
+                _clear_query(window, wait_for_micro=True)
             return
         _select_main(store_key, session)
     else:
@@ -81,7 +84,9 @@ def main() -> None:
 def summon(view: str, store_key: str, path: str, session: str) -> None:
     existing = _find_window(store_key, view, session)
     if existing:
-        _pop_micro(existing)
+        popped = _pop_micro(existing)
+        if view == "files":
+            _clear_query(existing, wait_for_micro=popped)
         _tmux("select-window", "-t", existing)
         return
 
@@ -137,6 +142,16 @@ def _pop_micro(window: str) -> bool:
         return False
     _tmux("send-keys", "-t", window, "C-c")
     return True
+
+
+def _clear_query(window: str, *, wait_for_micro: bool = False) -> None:
+    """Clear the search query in fzf so the browser is ready for a fresh search."""
+    if wait_for_micro:
+        for _ in range(20):
+            if not _has_process(window, "micro"):
+                break
+            time.sleep(0.005)
+    _tmux("send-keys", "-t", window, "C-e", "C-u")
 
 
 def _has_process(window: str, name: str) -> bool:
