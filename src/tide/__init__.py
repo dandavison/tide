@@ -43,7 +43,7 @@ os.environ["PATH"] = os.pathsep.join(
 VIEWS = {
     "files": "exec env FSI_ACTION=micro fsi",
     "search": "exec env RGI_EDITOR=micro rgi",
-    "git": "exec env GITU_SHOW_EDITOR=micro gitu",
+    "git": "exec env GITU_SHOW_EDITOR=micro delta --gitu",
 }
 
 
