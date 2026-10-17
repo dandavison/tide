@@ -23,7 +23,6 @@ import os
 import shlex
 import subprocess
 import sys
-import time
 
 # The tmux server runs with a minimal PATH; ensure we can find tmux. We stay on
 # the right server via $TMUX, inherited from the run-shell that invoked us.
@@ -37,11 +36,12 @@ os.environ["PATH"] = os.pathsep.join(
 )
 
 # `zsh -ic` gives the tools the login PATH; the env var makes each open micro
-# (as a child) at the selected line. `exec` replaces the shell with the tool so
+# (as a child) at the selected line. fsi's fzf listens on a per-pane socket so
+# that tide can clear its query. `exec` replaces the shell with the tool so
 # the window's root process IS the tool: quitting it closes the window (rather
 # than falling back to an interactive shell that looks like the work window).
 VIEWS = {
-    "files": "exec env FSI_ACTION=micro fsi",
+    "files": "exec env FSI_ACTION=micro FZFUI_LISTEN=/tmp/tide-$TMUX_PANE.sock fsi",
     "search": "exec env RGI_EDITOR=micro rgi",
     "git": "exec env GITU_SHOW_EDITOR=micro delta --gitu",
 }
@@ -74,7 +74,7 @@ def main() -> None:
         window = _find_window(store_key, current_view, session)
         if window and _pop_micro(window):
             if command == "files":
-                _clear_query(window, wait_for_micro=True)
+                _clear_query(window)
             return
         _select_main(store_key, session)
     else:
@@ -84,9 +84,9 @@ def main() -> None:
 def summon(view: str, store_key: str, path: str, session: str) -> None:
     existing = _find_window(store_key, view, session)
     if existing:
-        popped = _pop_micro(existing)
+        _pop_micro(existing)
         if view == "files":
-            _clear_query(existing, wait_for_micro=popped)
+            _clear_query(existing)
         _tmux("select-window", "-t", existing)
         return
 
@@ -144,14 +144,18 @@ def _pop_micro(window: str) -> bool:
     return True
 
 
-def _clear_query(window: str, *, wait_for_micro: bool = False) -> None:
-    """Clear the search query in fzf so the browser is ready for a fresh search."""
-    if wait_for_micro:
-        for _ in range(20):
-            if not _has_process(window, "micro"):
-                break
-            time.sleep(0.005)
-    _tmux("send-keys", "-t", window, "C-e", "C-u")
+def _clear_query(window: str) -> None:
+    """Clear the search query in fzf so the browser is ready for a fresh search.
+
+    fzf queues the action while micro is running and applies it when micro exits.
+    """
+    pane = _tmux("display-message", "-p", "-t", window, "#{pane_id}")
+    subprocess.run(
+        ["curl", "-sf", "--unix-socket", f"/tmp/tide-{pane}.sock", "-XPOST"]
+        + ["localhost", "-d", "clear-query"],
+        check=True,
+        timeout=5,
+    )
 
 
 def _has_process(window: str, name: str) -> bool:
