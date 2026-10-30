@@ -8,8 +8,8 @@ the pane where the key fired — no reliance on tmux's ambiguous "current window
 Each browser view is a long-lived tmux window running the tool; the tool opens
 micro as a child on Enter (Ctrl-C pops back), and switching between views is
 plain tmux window selection. There is no "edit" window — editing is always a
-child of a browser. Summoning a view always ensures the root browser tool is
-foregrounded, automatically saving and popping micro (via Ctrl-C) if active.
+child of a browser. Summoning a view resumes it exactly, including an active
+micro; pressing the view's key again pops micro (via Ctrl-C, which saves).
 
 Windows are tagged `@project = <store_key>` (wormhole's generic key, so wormhole
 reaps them on project close) and `@view`. The owning project is the current
@@ -84,9 +84,6 @@ def main() -> None:
 def summon(view: str, store_key: str, path: str, session: str) -> None:
     existing = _find_window(store_key, view, session)
     if existing:
-        _pop_micro(existing)
-        if view == "files":
-            _clear_query(existing)
         _tmux("select-window", "-t", existing)
         return
 
