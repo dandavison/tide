@@ -1,7 +1,8 @@
 #!/bin/bash
 # Pick any wormhole project, switch to it via wormhole (opening it if needed),
 # and go to one of its tide views (files, search, git, home), as the tide key
-# bindings do from inside the project. Exits non-zero if no project is chosen.
+# bindings do from inside the project, but fresh: with micro popped and the
+# files query cleared. Exits non-zero if no project is chosen.
 
 view="$1"
 
@@ -15,7 +16,7 @@ main() {
     wormhole open --project "$project" --land-in terminal || exit
     window="$(project_window "$project")"
     tmux run-shell -b -t "$window" \
-        "$HOME/.local/bin/tide $view '#{window_name}' '#{@project}' '#{@view}' '#{pane_current_path}' '#{session_name}'"
+        "$HOME/.local/bin/tide --fresh $view '#{window_name}' '#{@project}' '#{@view}' '#{pane_current_path}' '#{session_name}'"
 }
 
 # The projects and tasks wormhole is tracking, in wormhole's most-recent-first

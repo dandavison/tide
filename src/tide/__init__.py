@@ -10,6 +10,7 @@ micro as a child on Enter (Ctrl-C pops back), and switching between views is
 plain tmux window selection. There is no "edit" window — editing is always a
 child of a browser. Summoning a view resumes it exactly, including an active
 micro; pressing the view's key again pops micro (via Ctrl-C, which saves).
+`--fresh` instead summons the view with micro popped and the files query cleared.
 
 Windows are tagged `@project = <store_key>` (wormhole's generic key, so wormhole
 reaps them on project close) and `@view`. The owning project is the current
@@ -51,12 +52,16 @@ COMMANDS = (*VIEWS, "home")
 
 
 def main() -> None:
-    if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
+    args = sys.argv[1:]
+    fresh = args[:1] == ["--fresh"]
+    if fresh:
+        args = args[1:]
+    if not args or args[0] not in COMMANDS:
         sys.exit(
-            f"usage: tide {{{'|'.join(COMMANDS)}}} <window_name> <project> <view> <path> <session>"
+            f"usage: tide [--fresh] {{{'|'.join(COMMANDS)}}} <window_name> <project> <view> <path> <session>"
         )
-    command = sys.argv[1]
-    context = sys.argv[2:7]
+    command = args[0]
+    context = args[1:6]
     if len(context) < 5:  # convenience for manual invocation from inside a pane
         context = _tmux(
             "display-message",
@@ -78,12 +83,16 @@ def main() -> None:
             return
         _select_main(store_key, session)
     else:
-        summon(command, store_key, path, session)
+        summon(command, store_key, path, session, fresh)
 
 
-def summon(view: str, store_key: str, path: str, session: str) -> None:
+def summon(view: str, store_key: str, path: str, session: str, fresh: bool) -> None:
     existing = _find_window(store_key, view, session)
     if existing:
+        if fresh:
+            _pop_micro(existing)
+            if view == "files":
+                _clear_query(existing)
         _tmux("select-window", "-t", existing)
         return
 

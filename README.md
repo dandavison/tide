@@ -14,6 +14,8 @@ alacritty + tmux with wormhole managing one window per project.
   the view you're already in does the same (unless micro is active, in which case
   it pops micro back to the browser tool and, in the files view, clears the fzf
   query).
+  `bin/f-tide` (pick a project, then a view) instead always lands on the view
+  fresh: micro popped and the files query cleared.
 - **edit** is not a window. Each browser opens micro as a **child** on Enter
   (`RET` on a hunk in gitu); `Ctrl-C` (micro `Save,Quit`) pops back to the
   browser you launched from. The editor is wired purely via env vars —
