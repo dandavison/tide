@@ -80,7 +80,9 @@ local function shellPopup()
 end
 
 -- Pick a project, switch to its tmux window, and run tide's view there, as
--- tmux M-j/M-k/M-l/M-; do from inside it. onSuccess runs after the switch.
+-- tmux M-j/M-k/M-l/M-; do from inside it. With view "recent", pick a recently
+-- opened file instead and open it in its project's files view. onSuccess runs
+-- after the switch.
 local function projectPopup(view, onSuccess)
     M.popup({ "display-popup", "-E", "-w", "60%", "-h", "70%", "-b", "rounded", "-T", "", M.picker("f-tide " .. view) }, true, onSuccess)
 end
@@ -89,7 +91,10 @@ function M.bindKeys()
     hs.hotkey.bind({ "alt" }, "space", shellPopup)
     -- hyper is caps lock held, via Karabiner.
     local hyper = { "cmd", "alt", "ctrl", "shift" }
-    hs.hotkey.bind(hyper, "j", function() projectPopup("files") end)
+    -- ctrl + caps lock, via Karabiner: hyper without shift.
+    local ctrlHyper = { "cmd", "alt", "ctrl" }
+    hs.hotkey.bind(hyper, "j", function() projectPopup("recent") end)
+    hs.hotkey.bind(ctrlHyper, "j", function() projectPopup("files") end)
     hs.hotkey.bind(hyper, "k", function() projectPopup("search") end)
     hs.hotkey.bind(hyper, "l", function() projectPopup("git") end)
     hs.hotkey.bind(hyper, "space", function() projectPopup("home", shellPopup) end)

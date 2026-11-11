@@ -10,7 +10,8 @@ micro as a child on Enter (Ctrl-C pops back), and switching between views is
 plain tmux window selection. There is no "edit" window — editing is always a
 child of a browser. Summoning a view resumes it exactly, including an active
 micro; pressing the view's key again pops micro (via Ctrl-C, which saves).
-`--fresh` instead summons the view with micro popped and the files query cleared.
+`--fresh` instead summons the view with micro popped and the files query cleared;
+`--open PATH` summons the files view fresh and opens PATH in micro there.
 
 Windows are tagged `@project = <store_key>` (wormhole's generic key, so wormhole
 reaps them on project close) and `@view`. The owning project is the current
@@ -24,6 +25,7 @@ import os
 import shlex
 import subprocess
 import sys
+import time
 
 # The tmux server runs with a minimal PATH; ensure we can find tmux. We stay on
 # the right server via $TMUX, inherited from the run-shell that invoked us.
@@ -53,12 +55,15 @@ COMMANDS = (*VIEWS, "home")
 
 def main() -> None:
     args = sys.argv[1:]
-    fresh = args[:1] == ["--fresh"]
-    if fresh:
-        args = args[1:]
-    if not args or args[0] not in COMMANDS:
+    open_path = None
+    if args[:1] == ["--open"] and len(args) > 1:
+        open_path, args = args[1], args[2:]
+    fresh = bool(open_path)
+    if args[:1] == ["--fresh"]:
+        fresh, args = True, args[1:]
+    if not args or args[0] not in COMMANDS or (open_path and args[0] != "files"):
         sys.exit(
-            f"usage: tide [--fresh] {{{'|'.join(COMMANDS)}}} <window_name> <project> <view> <path> <session>"
+            f"usage: tide [--fresh | --open <file> files] {{{'|'.join(COMMANDS)}}} <window_name> <project> <view> <path> <session>"
         )
     command = args[0]
     context = args[1:6]
@@ -83,10 +88,12 @@ def main() -> None:
             return
         _select_main(store_key, session)
     else:
-        summon(command, store_key, path, session, fresh)
+        window = summon(command, store_key, path, session, fresh)
+        if open_path:
+            _open_in_micro(window, open_path)
 
 
-def summon(view: str, store_key: str, path: str, session: str, fresh: bool) -> None:
+def summon(view: str, store_key: str, path: str, session: str, fresh: bool) -> str:
     existing = _find_window(store_key, view, session)
     if existing:
         if fresh:
@@ -94,7 +101,7 @@ def summon(view: str, store_key: str, path: str, session: str, fresh: bool) -> N
             if view == "files":
                 _clear_query(existing)
         _tmux("select-window", "-t", existing)
-        return
+        return existing
 
     launch = f"SKIP_XOLMIS=1 zsh -ic {shlex.quote(VIEWS[view])}"
     window = _tmux(
@@ -113,6 +120,7 @@ def summon(view: str, store_key: str, path: str, session: str, fresh: bool) -> N
     _tmux("set-option", "-w", "-t", window, "@project", store_key)
     _tmux("set-option", "-w", "-t", window, "@view", view)
     _tmux("select-window", "-t", window)
+    return window
 
 
 def _select_main(store_key: str, session: str) -> None:
@@ -155,13 +163,31 @@ def _clear_query(window: str) -> None:
 
     fzf queues the action while micro is running and applies it when micro exits.
     """
+    _post_fzf_action(window, "clear-query")
+
+
+def _open_in_micro(window: str, file: str) -> None:
+    """Open file in micro as a child of the files view, as Enter in fsi does."""
+    cwd = _tmux("display-message", "-p", "-t", window, "#{pane_start_path}")
+    _post_fzf_action(window, f"execute:micro {shlex.quote(os.path.relpath(file, cwd))}")
+
+
+def _post_fzf_action(window: str, action: str) -> None:
     pane = _tmux("display-message", "-p", "-t", window, "#{pane_id}")
+    socket = f"/tmp/tide-{pane}.sock"
+    _wait_for(socket)
     subprocess.run(
-        ["curl", "-sf", "--unix-socket", f"/tmp/tide-{pane}.sock", "-XPOST"]
-        + ["localhost", "-d", "clear-query"],
+        ["curl", "-sf", "--unix-socket", socket, "-XPOST", "localhost", "-d", action],
         check=True,
         timeout=5,
     )
+
+
+def _wait_for(socket: str) -> None:
+    """Wait for fzf in a just-created files window to start listening."""
+    deadline = time.monotonic() + 5
+    while not os.path.exists(socket) and time.monotonic() < deadline:
+        time.sleep(0.05)
 
 
 def _has_process(window: str, name: str) -> bool:

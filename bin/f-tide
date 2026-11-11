@@ -3,20 +3,34 @@
 # and go to one of its tide views (files, search, git, home), as the tide key
 # bindings do from inside the project, but fresh: with micro popped and the
 # files query cleared. Exits non-zero if no project is chosen.
+#
+# `f-tide recent` instead picks from files recently opened in micro, across all
+# projects, and opens the chosen one in micro in its project's files view. Files
+# not under a project wormhole is tracking are not offered.
 
 view="$1"
 
+RECENT_FILES="$HOME/.config/micro/recent-files"
+
 main() {
-    local project window
-    project="$(projects | fzf)"
-    [ -n "$project" ] || exit 1
+    local project window options=(--fresh)
+    if [ "$view" = recent ]; then
+        local file
+        IFS=$'\t' read -r project _ file < <(recent_files | fzf --delimiter '\t' --with-nth 1,2)
+        [ -n "$file" ] || exit 1
+        view=files
+        options=(--open "$file")
+    else
+        project="$(projects | fzf)"
+        [ -n "$project" ] || exit 1
+    fi
     # Switch project via wormhole first so that the project's window, not the
     # window the popup was opened from, is tmux's last window when the view
     # window closes.
     wormhole open --project "$project" --land-in terminal || exit
     window="$(project_window "$project")"
     tmux run-shell -b -t "$window" \
-        "$HOME/.local/bin/tide --fresh $view '#{window_name}' '#{@project}' '#{@view}' '#{pane_current_path}' '#{session_name}'"
+        "$HOME/.local/bin/tide $(tmux_shell_words "${options[@]}") $view '#{window_name}' '#{@project}' '#{@view}' '#{pane_current_path}' '#{session_name}'"
 }
 
 # The projects and tasks wormhole is tracking, in wormhole's most-recent-first
@@ -28,11 +42,39 @@ projects() {
         awk '!seen[$0]++'
 }
 
+# `<project>\t<path relative to project>\t<absolute path>` for each existing
+# file in micro's open log, most recent first, assigned to the tracked project
+# with the longest matching directory.
+recent_files() {
+    awk '{ lines[NR] = $0 } END { for (i = NR; i > 0; i--) if (!seen[lines[i]]++) print lines[i] }' "$RECENT_FILES" |
+        grep -v '/\.git/' |
+        while IFS= read -r file; do [ -f "$file" ] && printf '%s\n' "$file"; done |
+        awk -F '\t' '
+            NR == FNR { dirs[$1] = $2; next }
+            {
+                best = ""
+                for (dir in dirs)
+                    if (index($0, dir "/") == 1 && length(dir) > length(best)) best = dir
+                if (best != "") printf "%s\t%s\t%s\n", dirs[best], substr($0, length(best) + 2), $0
+            }' <(wormhole project list --output json | jq -r '.current[] | "\(.path)\t\(.project_key)"') -
+}
+
 # A project's own window is the one carrying no @view. Target it by window id:
 # project names contain ':', which tmux would parse as session:window.
 project_window() {
     tmux list-windows -a -F '#{window_id}' \
         -f "#{&&:#{==:#{@project},$1},#{==:#{@view},}}"
+}
+
+# Words single-quoted for the shell that run-shell starts, with `#` doubled so
+# that tmux does not expand it as a format.
+tmux_shell_words() {
+    local word quoted=()
+    for word in "$@"; do
+        word="'${word//\'/\'\\\'\'}'"
+        quoted+=("${word//#/##}")
+    done
+    printf '%s' "${quoted[*]}"
 }
 
 main

@@ -15,7 +15,11 @@ alacritty + tmux with wormhole managing one window per project.
   it pops micro back to the browser tool and, in the files view, clears the fzf
   query).
   `bin/f-tide` (pick a project, then a view) instead always lands on the view
-  fresh: micro popped and the files query cleared.
+  fresh: micro popped and the files query cleared. `f-tide recent` picks from
+  files recently opened in micro, across projects, and opens the chosen one in
+  micro in its project's files view; it reads `~/.config/micro/recent-files`,
+  which a micro `onBufferOpen` hook in my dotfiles appends to. Files not under a
+  project wormhole is tracking are not offered.
 - **edit** is not a window. Each browser opens micro as a **child** on Enter
   (`RET` on a hunk in gitu); `Ctrl-C` (micro `Save,Quit`) pops back to the
   browser you launched from. The editor is wired purely via env vars —
