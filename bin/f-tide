@@ -16,7 +16,7 @@ main() {
     local project window options=(--fresh)
     if [ "$view" = recent ]; then
         local file
-        IFS=$'\t' read -r project _ file < <(recent_files | fzf --delimiter '\t' --with-nth 1,2)
+        IFS=$'\t' read -r project _ file < <(recent_files | fzf --no-sort --delimiter '\t' --with-nth 1,2)
         [ -n "$file" ] || exit 1
         view=files
         options=(--open "$file")
