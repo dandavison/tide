@@ -4,8 +4,8 @@
 # bindings do from inside the project, but fresh: with the editor popped and the
 # files query cleared. Exits non-zero if no project is chosen.
 #
-# `f-tide recent` instead picks from files recently opened in micro, across all
-# projects, and opens the chosen one in the editor in its project's files view.
+# `f-tide recent` instead picks from files recently opened in the editor, across
+# all projects, and opens the chosen one in the editor in its project's files view.
 # Files not under a project wormhole is tracking are not offered.
 
 view="$1"
@@ -43,7 +43,7 @@ projects() {
 }
 
 # `<project>\t<path relative to project>\t<absolute path>` for each existing
-# file in micro's open log, most recent first, assigned to the tracked project
+# file in the editors' open log, most recent first, assigned to the tracked project
 # with the longest matching directory.
 recent_files() {
     awk '{ lines[NR] = $0 } END { for (i = NR; i > 0; i--) if (!seen[lines[i]]++) print lines[i] }' "$RECENT_FILES" |

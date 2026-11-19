@@ -16,12 +16,11 @@ alacritty + tmux with wormhole managing one window per project.
   files view clears the fzf query).
   `bin/f-tide` (pick a project, then a view) instead always lands on the view
   fresh: the editor popped and the files query cleared. `f-tide recent` picks
-  from files recently opened in micro, across projects, and opens the chosen one
-  in the editor in its project's files view; it reads
-  `~/.config/micro/recent-files`, which a micro `onBufferOpen` hook in my
-  dotfiles appends to. Nothing records files opened in emacs, so with emacs as
-  the editor the list goes stale. Files not under a project wormhole is tracking
-  are not offered.
+  from files recently opened in the editor, across projects, and opens the
+  chosen one in the editor in its project's files view; it reads
+  `~/.config/micro/recent-files`, which a micro `onBufferOpen` hook and an emacs
+  `find-file-hook` in my dotfiles append to. Files not under a project wormhole
+  is tracking are not offered.
 - **edit** is not a window. Each browser opens the editor as a **child** on
   Enter (`RET` on a hunk in gitu); quitting it pops back to the browser you
   launched from. The editor is `tui-editor`, a script in my dotfiles that runs
