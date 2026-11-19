@@ -95,6 +95,10 @@ function M.bindKeys()
     local ctrlHyper = { "cmd", "alt", "ctrl" }
     hs.hotkey.bind(hyper, "j", function() projectPopup("recent") end)
     hs.hotkey.bind(ctrlHyper, "j", function() projectPopup("files") end)
+    -- Copy a project's directory to the clipboard, staying where you are.
+    hs.hotkey.bind(ctrlHyper, "c", function()
+        M.popup({ "display-popup", "-E", "-w", "60%", "-h", "70%", "-b", "rounded", "-T", "", M.picker("f-tide copy-path") })
+    end)
     hs.hotkey.bind(hyper, "k", function() projectPopup("search") end)
     hs.hotkey.bind(hyper, "l", function() projectPopup("git") end)
     hs.hotkey.bind(hyper, "space", function() projectPopup("home", shellPopup) end)
