@@ -1,7 +1,7 @@
 # tide
 
 Per-project persistent browser windows in tmux, over your existing tools
-([fsi](https://github.com/dandavison/fzfui), rgi, gitu, micro). Built for
+([fsi](https://github.com/dandavison/fzfui), rgi, gitu, a terminal editor). Built for
 alacritty + tmux with wormhole managing one window per project.
 
 ## Model
@@ -11,20 +11,24 @@ alacritty + tmux with wormhole managing one window per project.
   create-and-select the window for the current project. Persistent: switching
   away leaves the tool running; switching back resumes it exactly. `Alt-;`
   (`tide home`) always returns to the main (work) window; pressing the key for
-  the view you're already in does the same (unless micro is active, in which case
-  it pops micro back to the browser tool and, in the files view, clears the fzf
-  query).
+  the view you're already in does the same (unless the editor is active, in which
+  case it saves and quits the editor, returning to the browser tool, and in the
+  files view clears the fzf query).
   `bin/f-tide` (pick a project, then a view) instead always lands on the view
-  fresh: micro popped and the files query cleared. `f-tide recent` picks from
-  files recently opened in micro, across projects, and opens the chosen one in
-  micro in its project's files view; it reads `~/.config/micro/recent-files`,
-  which a micro `onBufferOpen` hook in my dotfiles appends to. Files not under a
-  project wormhole is tracking are not offered.
-- **edit** is not a window. Each browser opens micro as a **child** on Enter
-  (`RET` on a hunk in gitu); `Ctrl-C` (micro `Save,Quit`) pops back to the
-  browser you launched from. The editor is wired purely via env vars —
-  `FSI_ACTION=micro`, `RGI_EDITOR=micro`, `GITU_SHOW_EDITOR=micro` — so the
-  tools stay unmodified and standalone.
+  fresh: the editor popped and the files query cleared. `f-tide recent` picks
+  from files recently opened in micro, across projects, and opens the chosen one
+  in the editor in its project's files view; it reads
+  `~/.config/micro/recent-files`, which a micro `onBufferOpen` hook in my
+  dotfiles appends to. Nothing records files opened in emacs, so with emacs as
+  the editor the list goes stale. Files not under a project wormhole is tracking
+  are not offered.
+- **edit** is not a window. Each browser opens the editor as a **child** on
+  Enter (`RET` on a hunk in gitu); quitting it pops back to the browser you
+  launched from. The editor is `tui-editor`, a script in my dotfiles that runs
+  emacs or micro. It is wired purely via env vars — `FSI_ACTION`, `RGI_EDITOR`,
+  `GITU_SHOW_EDITOR` — so the tools stay unmodified and standalone. To pop the
+  editor, tide sends the editor's save-and-quit keys (`QUIT_KEYS` in
+  `src/tide/__init__.py`).
 - Switching between views is plain tmux window selection, so no dispatcher, no
   IPC, and every view keeps full state (fzf query, scroll, cursor).
 

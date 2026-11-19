@@ -6,12 +6,13 @@ context via tmux format expansion (`#{window_name}` etc.), so we act on exactly
 the pane where the key fired — no reliance on tmux's ambiguous "current window".
 
 Each browser view is a long-lived tmux window running the tool; the tool opens
-micro as a child on Enter (Ctrl-C pops back), and switching between views is
-plain tmux window selection. There is no "edit" window — editing is always a
-child of a browser. Summoning a view resumes it exactly, including an active
-micro; pressing the view's key again pops micro (via Ctrl-C, which saves).
-`--fresh` instead summons the view with micro popped and the files query cleared;
-`--open PATH` summons the files view fresh and opens PATH in micro there.
+the editor (`tui-editor`) as a child on Enter (quitting it pops back), and
+switching between views is plain tmux window selection. There is no "edit"
+window — editing is always a child of a browser. Summoning a view resumes it
+exactly, including an active editor; pressing the view's key again pops the
+editor (saving first). `--fresh` instead summons the view with the editor popped
+and the files query cleared; `--open PATH` summons the files view fresh and opens
+PATH in the editor there.
 
 Windows are tagged `@project = <store_key>` (wormhole's generic key, so wormhole
 reaps them on project close) and `@view`. The owning project is the current
@@ -38,15 +39,21 @@ os.environ["PATH"] = os.pathsep.join(
     ]
 )
 
-# `zsh -ic` gives the tools the login PATH; the env var makes each open micro
-# (as a child) at the selected line. fsi's fzf listens on a per-pane socket so
+# `zsh -ic` gives the tools the login PATH; the env var makes each open the
+# editor (as a child) at the selected line. fsi's fzf listens on a per-pane socket so
 # that tide can clear its query. `exec` replaces the shell with the tool so
 # the window's root process IS the tool: quitting it closes the window (rather
 # than falling back to an interactive shell that looks like the work window).
 VIEWS = {
-    "files": "exec env FSI_ACTION=micro FZFUI_LISTEN=/tmp/tide-$TMUX_PANE.sock fsi",
-    "search": "exec env RGI_EDITOR=micro rgi",
-    "git": "exec env GITU_SHOW_EDITOR=micro delta --gitu",
+    "files": "exec env FSI_ACTION=tui-editor FZFUI_LISTEN=/tmp/tide-$TMUX_PANE.sock fsi",
+    "search": "exec env RGI_EDITOR=tui-editor rgi",
+    "git": "exec env GITU_SHOW_EDITOR=tui-editor delta --gitu",
+}
+
+# The keys that save and quit each editor tui-editor may run, by process name.
+QUIT_KEYS = {
+    "micro": ["C-c"],
+    "Emacs": ["C-x", "C-s", "C-x", "C-c"],
 }
 
 
@@ -76,13 +83,13 @@ def main() -> None:
     name, project, current_view, path, session = context
     store_key = project or name
     # `home` always goes to the work window; a view key toggles back if you are
-    # already in that view (unless micro is active, in which case it pops back
-    # to the browser tool).
+    # already in that view (unless the editor is active, in which case it pops
+    # back to the browser tool).
     if command == "home":
         _select_main(store_key, session)
     elif command == current_view:
         window = _find_window(store_key, current_view, session)
-        if window and _pop_micro(window):
+        if window and _pop_editor(window):
             if command == "files":
                 _clear_query(window)
             return
@@ -90,14 +97,14 @@ def main() -> None:
     else:
         window = summon(command, store_key, path, session, fresh)
         if open_path:
-            _open_in_micro(window, open_path)
+            _open_in_editor(window, open_path)
 
 
 def summon(view: str, store_key: str, path: str, session: str, fresh: bool) -> str:
     existing = _find_window(store_key, view, session)
     if existing:
         if fresh:
-            _pop_micro(existing)
+            _pop_editor(existing)
             if view == "files":
                 _clear_query(existing)
         _tmux("select-window", "-t", existing)
@@ -150,26 +157,30 @@ def _tmux(*args: str) -> str:
     ).stdout.strip()
 
 
-def _pop_micro(window: str) -> bool:
-    """If micro is running as a child in window, pop back to the browser tool."""
-    if not _has_process(window, "micro"):
-        return False
-    _tmux("send-keys", "-t", window, "C-c")
-    return True
+def _pop_editor(window: str) -> bool:
+    """If an editor is running as a child in window, save and quit it."""
+    processes = _processes(window)
+    for name, keys in QUIT_KEYS.items():
+        if name in processes:
+            _tmux("send-keys", "-t", window, *keys)
+            return True
+    return False
 
 
 def _clear_query(window: str) -> None:
     """Clear the search query in fzf so the browser is ready for a fresh search.
 
-    fzf queues the action while micro is running and applies it when micro exits.
+    fzf queues the action while the editor is running and applies it when it exits.
     """
     _post_fzf_action(window, "clear-query")
 
 
-def _open_in_micro(window: str, file: str) -> None:
-    """Open file in micro as a child of the files view, as Enter in fsi does."""
+def _open_in_editor(window: str, file: str) -> None:
+    """Open file in the editor as a child of the files view, as Enter in fsi does."""
     cwd = _tmux("display-message", "-p", "-t", window, "#{pane_start_path}")
-    _post_fzf_action(window, f"execute:micro {shlex.quote(os.path.relpath(file, cwd))}")
+    _post_fzf_action(
+        window, f"execute:tui-editor {shlex.quote(os.path.relpath(file, cwd))}"
+    )
 
 
 def _post_fzf_action(window: str, action: str) -> None:
@@ -190,18 +201,18 @@ def _wait_for(socket: str) -> None:
         time.sleep(0.05)
 
 
-def _has_process(window: str, name: str) -> bool:
-    """Check whether a process named `name` is running on the window's pane tty."""
+def _processes(window: str) -> set[str]:
+    """The names of the processes running on the window's pane tty."""
     try:
         tty = _tmux("display-message", "-p", "-t", window, "#{pane_tty}")
         if not tty:
-            return False
+            return set()
         out = subprocess.run(
             ["ps", "-t", tty, "-o", "comm="],
             capture_output=True,
             text=True,
             check=True,
         ).stdout
-        return any(os.path.basename(line.strip()) == name for line in out.splitlines())
+        return {os.path.basename(line.strip()) for line in out.splitlines()}
     except Exception:
-        return False
+        return set()
