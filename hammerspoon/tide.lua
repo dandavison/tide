@@ -75,8 +75,14 @@ function M.picker(command)
     return "zsh -ic '" .. os.getenv("HOME") .. "/bin/" .. command .. "'"
 end
 
+-- A popup covering the whole tmux client, with a rounded border, running
+-- command in the directory of the pane it was opened from.
+function M.fullPopup(command, keepFocus)
+    M.popup({ "display-popup", "-d", "#{pane_current_path}", "-E", "-w", "100%", "-h", "100%", "-b", "rounded", "-T", "", command }, keepFocus)
+end
+
 local function shellPopup()
-    M.popup({ "display-popup", "-d", "#{pane_current_path}", "-E", "-w", "100%", "-h", "100%", "-b", "rounded", "-T", "", "SKIP_XOLMIS=1 zsh" })
+    M.fullPopup("SKIP_XOLMIS=1 zsh")
 end
 
 -- Pick a project, switch to its tmux window, and run tide's view there, as
