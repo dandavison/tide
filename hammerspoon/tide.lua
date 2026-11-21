@@ -9,7 +9,8 @@ local tmux = hs.execute("command -v tmux", true):gsub("%s+$", "")
 
 local tasks = {} -- retain tasks so GC doesn't drop their completion callbacks
 
-local function run(binary, args, done)
+-- Run binary with args, keeping the task alive until it exits; done gets its exit code.
+function M.run(binary, args, done)
     local task
     task = hs.task.new(binary, function(exitCode)
         tasks[task] = nil
@@ -19,7 +20,7 @@ local function run(binary, args, done)
     task:start()
 end
 
-local function focusAlacritty()
+function M.focusAlacritty()
     local app = hs.application.find("alacritty")
     if not (app and app:isFrontmost()) then
         hs.application.launchOrFocus("/Applications/Alacritty.app")
@@ -49,8 +50,8 @@ end
 -- somewhere in tmux). onSuccess runs if the popup's command exits 0.
 function M.popup(args, keepFocus, onSuccess)
     local prev = hs.application.frontmostApplication()
-    focusAlacritty()
-    run(tmux, withMouseOff(args), function(exitCode)
+    M.focusAlacritty()
+    M.run(tmux, withMouseOff(args), function(exitCode)
         if exitCode == 0 and onSuccess then
             onSuccess()
             return
@@ -112,8 +113,8 @@ function M.bindKeys()
     -- tide's git view in the current tmux window, i.e. tmux M-l there: given
     -- no context, tide reads the current pane's.
     hs.hotkey.bind({ "cmd" }, "m", function()
-        focusAlacritty()
-        run(os.getenv("HOME") .. "/.local/bin/tide", { "git" })
+        M.focusAlacritty()
+        M.run(os.getenv("HOME") .. "/.local/bin/tide", { "git" })
     end)
 end
 
