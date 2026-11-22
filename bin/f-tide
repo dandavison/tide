@@ -9,7 +9,8 @@
 # Files not under a project wormhole is tracking are not offered.
 #
 # `f-tide copy-path` instead picks a project wormhole is tracking and copies its
-# directory to the clipboard, without switching to it.
+# directory to the clipboard, without switching to it. Tab instead of Enter goes
+# on to pick a file in the project and copies the file's absolute path.
 
 view="$1"
 
@@ -18,10 +19,7 @@ RECENT_FILES="$HOME/.config/micro/recent-files"
 main() {
     local project window options=(--fresh)
     if [ "$view" = copy-path ]; then
-        local path
-        IFS=$'\t' read -r _ path < <(tracked_projects | fzf --delimiter '\t' --with-nth 1)
-        [ -n "$path" ] || exit 1
-        (cd "$path" && printf %s "$(pwd)" | pbcopy)
+        copy_path
         return
     elif [ "$view" = recent ]; then
         local file
@@ -40,6 +38,26 @@ main() {
     window="$(project_window "$project")"
     tmux run-shell -b -t "$window" \
         "$HOME/.local/bin/tide $(tmux_shell_words "${options[@]}") $view '#{window_name}' '#{@project}' '#{@view}' '#{pane_current_path}' '#{session_name}'"
+}
+
+# Copy a project's directory, or with Tab a file in it, to the clipboard, with
+# no trailing newline.
+copy_path() {
+    local key path file
+    {
+        read -r key
+        IFS=$'\t' read -r _ path
+    } < <(tracked_projects | fzf --delimiter '\t' --with-nth 1 --expect tab --header 'enter: copy directory, tab: pick file')
+    [ -n "$path" ] || exit 1
+    cd "$path" || exit
+    if [ "$key" = tab ]; then
+        file="$(fd --type file | fzf)"
+        [ -n "$file" ] || exit 1
+        path="$PWD/$file"
+    else
+        path="$PWD"
+    fi
+    printf %s "$path" | pbcopy
 }
 
 # The projects and tasks wormhole is tracking, in wormhole's most-recent-first

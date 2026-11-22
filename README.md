@@ -21,7 +21,8 @@ alacritty + tmux with wormhole managing one window per project.
   `~/.config/micro/recent-files`, which a micro `onBufferOpen` hook and an emacs
   `find-file-hook` in my dotfiles append to. Files not under a project wormhole
   is tracking are not offered. `f-tide copy-path` picks a project wormhole is
-  tracking and copies its directory to the clipboard without switching to it.
+  tracking and copies its directory to the clipboard without switching to it;
+  Tab instead of Enter goes on to pick a file in the project and copies its path.
 - **edit** is not a window. Each browser opens the editor as a **child** on
   Enter (`RET` on a hunk in gitu); quitting it pops back to the browser you
   launched from. The editor is `tui-editor`, a script in my dotfiles that runs
